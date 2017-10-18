@@ -1,0 +1,34 @@
+QUESTION => Explain how xsend and xreceive are O(1) operations
+
+ANSWER   => (i) XSEND: xsend first checks, if the buffer of the process it is trying to send the message to is full or not. If it is, then it enqueues the current process in the queue of the receiving process which is a O(1) operation, and calls resched() so that it is blocked until it can send a message.
+Once it is ready to send the message, it inserts the message in receiving process' buffer. Since we need to receive messages in LIFO order and priority messages should be received before the normal messages, my algorithm tries to keep these two types of messages in a coninuous subarray. More specifically, I have kept an index pointer prxpriomsg which determines the next location in buffer where next priority message should be inserted. It is initialized to 0 when process is created. Similarly, I have kept an index pointer, prxnormmsg which determines the next location in buffer where next normal message should be inserted. It is initialized to NMSG - 1 (a macro equal to 20) when process is created, i.e., last index of the message buffer. Every time a priority message is to be sent, prxpriomsg is incremented after message has been inserted at location prxpriomsg in the buffer and similarly prxnormmsg is decremented every time a normal msg is sent. Thus, at any point, all priority messages of receiveing process are in its buffer between indexes [0, prspriomsg) and normal messages are between indexes [prxnormmsg + 1, NSMG - 1]. So this way, insertion in the buffer only takes O(1) time. Before returning xsend readies the receiving process if has been waiting to receive a process.  
+
+     	    (ii) XRECEIVE: xreceive first checks, if there are any messages sent to it. If not, then its changes its state to PR_XRECV and goes into blocking state by calling resched(). When, resched returns, i.e., when the process has been sent atleast 1 message, it tries to extract the next appropriate message. It first checks if there are any high priority messages by checking if prxpriomsg index counter > 0. If it is then, it extracts last sent, priority message from buffer which is at index prxpriomsg - 1 in the buffer. If there are no priority messages then it extract last sent, normal message form the buffer which is ate index prxnormmsg + 1 in the buffer.
+
+/* --------------------------------------------------------------------------------- */
+
+QUESTION => Explain how sender processes block only if the receiver's buffer is completely full
+
+ANSWER   => I keep track of total number of processes sent to the receiving process in a counter prxmsgcnt which is intitialized to 0 when process is created. It is incremented in xsend every time a process is sent to receiving message and decremented in xreceive every time a process is recevied by the receiving process. Thus, at the beginning of xsend before doing any sending activity, it checks if the counter equals to NSMG (maximum messages allowed in receivers bufffer = 20). If it is, then it means receviers buffer is full so sending process will change its state to PR_XSEND  and it will get enqueued in receiving process' wait queue and call resched().resched will dequeue the next process from readylist and context switch to it. Thus, resched will not return until, sending process is again inserted into readylist of XINU somehow. Sending process is only readied in xreceive only when there is a free spot in the buffer, i.e., every time receiving process removes/recevies a message from its buffer, it dequeues next process from its wiat queue before returning. Thusm when sending process is readied, it will return from resched() and continue sending the message by inserting it into receving process' buffer. 
+
+/* --------------------------------------------------------------------------------- */
+
+QUESTION => Explain how normal and high priority messages are stored in a single array
+
+ANSWER   => As explained in question 1, I keep an index counter prxpriomsg to determine where should next high priority message be inserted. Similarly, there is also an index counter, prxnormprio, for normal messages. prxpriomsg and prxnormmsg are initialized to 0 and NSMG - 1 respectively, when the process is created. Thus, all messages are stored in a single array and at any point the array follows following variant:
+
+(i)  The array has all priority messages stored between indices [0, prxpriomsg).
+(ii) The array has all normal messages stored between indices [prnormmsg + 1, NSMG - 1).
+(iii) Space between the indices prspriomsg and prxnormmsg is always empty and prxpriomsg <= prxnormsg. So, array can never store more than NSMG = 20, messages
+
+/* --------------------------------------------------------------------------------- */
+
+QUESTION => Explain how messages of equal priority are received in a LIFO order
+
+ANSWER   => Using the two index pointers prxpriomsg and prxnormmsg, I get the location of last high and normal priority message inserted in buffer respectively. I increment prxpriomsg in xsend whenever a high priority message is inserted in buffer at index prxpriomsg. Thus, I know, the last high priority message inserted in the buffer is always at the index prxpriomsg - 1. Similarly, I decrement prxnormmsg in xsend whenever a normal priority message is inserted in the buffer at index prxnormmsg. Thus, I know, the last normal priority message inserted in the buffer is always at the index prxnormmsg + 1. 
+
+/* --------------------------------------------------------------------------------- */
+
+QUESTION => Explain how blocked sender processes are readied in the FIFO order
+
+ANSWER   => I use xinu's queue data structure to maintain the wait queue of receving process. For each process, a newqueue is created in initialize.c when the XINU initializes its data structures. Thus, sender proceesses are enqueued at the back of the queue, in xsend whenever buffer is full using enqueue() funtion and xreceive dequeues the process from the back front queue. 
